@@ -65,3 +65,7 @@ Write the output in ${language}.`;
 export function buildRewriteUser(inputText: string): string {
   return `Rewrite the following text in the author's voice:\n\n${inputText}`;
 }
+
+export function buildRewriteIterationUser(previousOutput: string, instruction: string): string {
+  return `Here is the current version:\n\n${previousOutput}\n\nPlease refine it with this instruction: ${instruction}`;
+}

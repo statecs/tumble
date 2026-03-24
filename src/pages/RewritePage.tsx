@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Loader2, Wand2, Copy, Check, Highlighter } from 'lucide-react';
+import { Loader2, Wand2, Copy, Check, Highlighter, ChevronLeft, ChevronRight, SendHorizontal } from 'lucide-react';
 import type { JSX } from 'react';
 
 function computeDiffTokens(inputText: string, outputText: string): JSX.Element[] {
@@ -24,7 +25,9 @@ function computeDiffTokens(inputText: string, outputText: string): JSX.Element[]
 
 export default function RewritePage() {
   const [inputText, setInputText] = useState('');
-  const [outputText, setOutputText] = useState('');
+  const [history, setHistory] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+  const [followUpText, setFollowUpText] = useState('');
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showDiff, setShowDiff] = useState(false);
@@ -37,6 +40,8 @@ export default function RewritePage() {
   } | null>(null);
   const [libraryCount, setLibraryCount] = useState<number | null>(null);
 
+  const outputText = history[historyIndex] ?? '';
+
   useEffect(() => {
     api.getTexts({ limit: 1 }).then(res => setLibraryCount(res.total)).catch(() => {});
   }, []);
@@ -44,12 +49,15 @@ export default function RewritePage() {
   const handleRewrite = async () => {
     if (!inputText.trim()) return;
     setLoading(true);
-    setOutputText('');
+    setHistory([]);
+    setHistoryIndex(0);
+    setFollowUpText('');
     setShowDiff(false);
     setStats(null);
     try {
       const result = await api.rewrite(inputText, language, model);
-      setOutputText(result.rewritten);
+      setHistory([result.rewritten]);
+      setHistoryIndex(0);
       setStats({
         inputTokens: result.inputTokens,
         outputTokens: result.outputTokens,
@@ -57,6 +65,29 @@ export default function RewritePage() {
       });
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Rewrite failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleIterate = async () => {
+    if (!followUpText.trim() || !outputText) return;
+    setLoading(true);
+    try {
+      const result = await api.rewrite(inputText, language, model, {
+        previousOutput: history[historyIndex],
+        instruction: followUpText,
+      });
+      setHistory(prev => [...prev.slice(0, historyIndex + 1), result.rewritten]);
+      setHistoryIndex(prev => prev + 1);
+      setFollowUpText('');
+      setStats({
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+        examplesUsed: result.examplesUsed,
+      });
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Refinement failed');
     } finally {
       setLoading(false);
     }
@@ -143,7 +174,32 @@ export default function RewritePage() {
         {/* Output panel */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Output</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Output</span>
+              {history.length > 1 && (
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setHistoryIndex(i => i - 1)}
+                    disabled={historyIndex === 0}
+                    className="h-6 w-6 p-0"
+                  >
+                    <ChevronLeft className="h-3 w-3" />
+                  </Button>
+                  <span className="text-xs text-muted-foreground tabular-nums">{historyIndex + 1} / {history.length}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setHistoryIndex(i => i + 1)}
+                    disabled={historyIndex === history.length - 1}
+                    className="h-6 w-6 p-0"
+                  >
+                    <ChevronRight className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+            </div>
             {outputText && (
               <div className="flex items-center gap-1">
                 <Button
@@ -181,6 +237,26 @@ export default function RewritePage() {
               </p>
             )}
           </div>
+          {history.length > 0 && (
+            <div className="flex gap-2">
+              <Input
+                value={followUpText}
+                onChange={e => setFollowUpText(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleIterate()}
+                placeholder="Refine: e.g. make it shorter, add more energy..."
+                disabled={loading}
+                className="text-sm"
+              />
+              <Button
+                onClick={handleIterate}
+                disabled={loading || !followUpText.trim()}
+                size="sm"
+                className="shrink-0"
+              >
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizontal className="h-4 w-4" />}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>

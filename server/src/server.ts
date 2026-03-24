@@ -9,7 +9,8 @@ import {
   buildCategorizationUser,
   parseCategorizationResult,
   buildRewriteSystem,
-  buildRewriteUser
+  buildRewriteUser,
+  buildRewriteIterationUser
 } from './prompts';
 import { logger } from './logger';
 
@@ -399,7 +400,7 @@ app.put('/api/settings/preferences', requireApiKey, async (req, res) => {
 // ── Rewrite ───────────────────────────────────────────────────────────────────
 
 app.post('/api/rewrite', requireApiKey, async (req, res) => {
-  const { text, language = 'English', model = 'claude' } = req.body;
+  const { text, language = 'English', model = 'claude', previousOutput, instruction } = req.body;
   if (!text) { res.status(400).json({ error: 'text is required' }); return; }
 
   try {
@@ -431,7 +432,9 @@ app.post('/api/rewrite', requireApiKey, async (req, res) => {
     }));
 
     const systemPrompt = buildRewriteSystem(examples, preferences, language);
-    const userMessage = buildRewriteUser(text);
+    const userMessage = (previousOutput && instruction)
+      ? buildRewriteIterationUser(previousOutput, instruction)
+      : buildRewriteUser(text);
 
     const provider = model === 'openai' ? 'openai' : 'claude';
     const result = await callAI(provider, systemPrompt, userMessage, 6000);
