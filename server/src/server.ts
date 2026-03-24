@@ -399,7 +399,7 @@ app.put('/api/settings/preferences', requireApiKey, async (req, res) => {
 // ── Rewrite ───────────────────────────────────────────────────────────────────
 
 app.post('/api/rewrite', requireApiKey, async (req, res) => {
-  const { text } = req.body;
+  const { text, language = 'English' } = req.body;
   if (!text) { res.status(400).json({ error: 'text is required' }); return; }
 
   try {
@@ -430,7 +430,7 @@ app.post('/api/rewrite', requireApiKey, async (req, res) => {
       category: row.categories || 'other'
     }));
 
-    const systemPrompt = buildRewriteSystem(examples, preferences);
+    const systemPrompt = buildRewriteSystem(examples, preferences, language);
     const userMessage = buildRewriteUser(text);
 
     const result = await callClaude(systemPrompt, userMessage, 6000);

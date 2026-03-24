@@ -32,7 +32,7 @@ export function parseCategorizationResult(text: string): CategorizationResult {
   }
 }
 
-export function buildRewriteSystem(examples: Array<{ title: string; content: string; category: string }>, preferences?: string): string {
+export function buildRewriteSystem(examples: Array<{ title: string; content: string; category: string }>, preferences?: string, language: string = 'English'): string {
   const examplesBlock = examples
     .map((ex, i) => {
       const excerpt = ex.content.slice(0, 800);
@@ -57,7 +57,9 @@ When rewriting, preserve:
 - Structural patterns (how paragraphs are opened/closed)
 - Any distinctive quirks or recurring phrases
 
-Rewrite the text to sound authentically like this author. Do not add explanations or meta-commentary — return only the rewritten text.`;
+Rewrite the text to sound authentically like this author. Do not add explanations or meta-commentary — return only the rewritten text.
+
+Write the output in ${language}.`;
 }
 
 export function buildRewriteUser(inputText: string): string {

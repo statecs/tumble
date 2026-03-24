@@ -3,6 +3,7 @@ import { api, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Loader2, Wand2, Copy, Check } from 'lucide-react';
 
@@ -11,6 +12,7 @@ export default function RewritePage() {
   const [outputText, setOutputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [language, setLanguage] = useState<'English' | 'Swedish'>('English');
   const [stats, setStats] = useState<{
     inputTokens: number;
     outputTokens: number;
@@ -28,7 +30,7 @@ export default function RewritePage() {
     setOutputText('');
     setStats(null);
     try {
-      const result = await api.rewrite(inputText);
+      const result = await api.rewrite(inputText, language);
       setOutputText(result.rewritten);
       setStats({
         inputTokens: result.inputTokens,
@@ -87,17 +89,28 @@ export default function RewritePage() {
             placeholder="Paste the text you want to rewrite in your voice..."
             className="min-h-[420px] resize-y text-sm"
           />
-          <Button
-            onClick={handleRewrite}
-            disabled={loading || !inputText.trim() || libraryCount === 0}
-            className="w-full"
-          >
-            {loading ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Rewriting...</>
-            ) : (
-              <><Wand2 className="mr-2 h-4 w-4" /> Rewrite in my style</>
-            )}
-          </Button>
+          <div className="flex gap-2">
+            <Select value={language} onValueChange={(v) => setLanguage(v as 'English' | 'Swedish')}>
+              <SelectTrigger className="w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="English">English</SelectItem>
+                <SelectItem value="Swedish">Swedish</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              onClick={handleRewrite}
+              disabled={loading || !inputText.trim() || libraryCount === 0}
+              className="flex-1"
+            >
+              {loading ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Rewriting...</>
+              ) : (
+                <><Wand2 className="mr-2 h-4 w-4" /> Rewrite in my style</>
+              )}
+            </Button>
+          </div>
         </div>
 
         {/* Output panel */}
