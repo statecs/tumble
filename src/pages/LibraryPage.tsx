@@ -108,6 +108,16 @@ export default function LibraryPage() {
     }
   };
 
+  const handleSelectText = async (id: string) => {
+    try {
+      const full = await api.getText(id);
+      setSelectedText(full);
+      setEditing(false);
+    } catch {
+      toast.error('Failed to load text');
+    }
+  };
+
   const openEdit = (text: Text) => {
     setEditTitle(text.title);
     setEditContent(text.content);
@@ -252,7 +262,7 @@ export default function LibraryPage() {
               {texts.map(text => (
                 <button
                   key={text.id}
-                  onClick={() => { setSelectedText(text); setEditing(false); }}
+                  onClick={() => { handleSelectText(text.id); }}
                   className="w-full text-left rounded-lg border bg-card hover:bg-accent/50 transition-colors p-4 space-y-2"
                 >
                   <div className="flex items-start justify-between gap-2">
