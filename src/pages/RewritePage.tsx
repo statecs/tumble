@@ -29,6 +29,7 @@ export default function RewritePage() {
   const [copied, setCopied] = useState(false);
   const [showDiff, setShowDiff] = useState(false);
   const [language, setLanguage] = useState<'English' | 'Swedish'>('English');
+  const [model, setModel] = useState<'claude' | 'openai'>('claude');
   const [stats, setStats] = useState<{
     inputTokens: number;
     outputTokens: number;
@@ -47,7 +48,7 @@ export default function RewritePage() {
     setShowDiff(false);
     setStats(null);
     try {
-      const result = await api.rewrite(inputText, language);
+      const result = await api.rewrite(inputText, language, model);
       setOutputText(result.rewritten);
       setStats({
         inputTokens: result.inputTokens,
@@ -114,6 +115,15 @@ export default function RewritePage() {
               <SelectContent>
                 <SelectItem value="English">English</SelectItem>
                 <SelectItem value="Swedish">Swedish</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={model} onValueChange={(v) => setModel(v as 'claude' | 'openai')}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="claude">Claude Sonnet</SelectItem>
+                <SelectItem value="openai">GPT</SelectItem>
               </SelectContent>
             </Select>
             <Button

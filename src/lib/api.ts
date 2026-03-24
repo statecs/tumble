@@ -52,8 +52,8 @@ export const api = {
   deleteText: (id: string) =>
     request<{ success: boolean }>(`/api/texts/${id}`, { method: 'DELETE' }),
 
-  rewrite: (text: string, language: string) =>
-    request<RewriteResult>('/api/rewrite', { method: 'POST', body: JSON.stringify({ text, language }) }),
+  rewrite: (text: string, language: string, model: string) =>
+    request<RewriteResult>('/api/rewrite', { method: 'POST', body: JSON.stringify({ text, language, model }) }),
 
   getPreferences: () => request<{ preferences: string }>('/api/settings/preferences'),
   savePreferences: (preferences: string) =>

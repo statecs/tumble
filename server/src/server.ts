@@ -3,7 +3,7 @@ import cors from 'cors';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { pool, initDatabase, RowDataPacket, ResultSetHeader } from './db';
-import { callClaude } from './ai';
+import { callClaude, callAI } from './ai';
 import {
   buildCategorizationSystem,
   buildCategorizationUser,
@@ -399,7 +399,7 @@ app.put('/api/settings/preferences', requireApiKey, async (req, res) => {
 // ── Rewrite ───────────────────────────────────────────────────────────────────
 
 app.post('/api/rewrite', requireApiKey, async (req, res) => {
-  const { text, language = 'English' } = req.body;
+  const { text, language = 'English', model = 'claude' } = req.body;
   if (!text) { res.status(400).json({ error: 'text is required' }); return; }
 
   try {
@@ -433,7 +433,8 @@ app.post('/api/rewrite', requireApiKey, async (req, res) => {
     const systemPrompt = buildRewriteSystem(examples, preferences, language);
     const userMessage = buildRewriteUser(text);
 
-    const result = await callClaude(systemPrompt, userMessage, 6000);
+    const provider = model === 'openai' ? 'openai' : 'claude';
+    const result = await callAI(provider, systemPrompt, userMessage, 6000);
 
     // Log to rewrite_logs
     await pool.execute(
