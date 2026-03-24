@@ -15,18 +15,6 @@ export default function Navbar() {
             <span className="font-semibold text-lg tracking-tight">Tumble</span>
             <div className="flex gap-1">
               <Link
-                to="/"
-                className={cn(
-                  'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-                  location.pathname === '/'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                )}
-              >
-                <BookOpen className="h-4 w-4" />
-                Library
-              </Link>
-              <Link
                 to="/rewrite"
                 className={cn(
                   'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
@@ -37,6 +25,18 @@ export default function Navbar() {
               >
                 <Wand2 className="h-4 w-4" />
                 Rewrite
+              </Link>
+              <Link
+                to="/"
+                className={cn(
+                  'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                  location.pathname === '/'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                )}
+              >
+                <BookOpen className="h-4 w-4" />
+                Library
               </Link>
               <Link
                 to="/personalise"
