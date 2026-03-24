@@ -5,13 +5,29 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Loader2, Wand2, Copy, Check } from 'lucide-react';
+import { Loader2, Wand2, Copy, Check, Highlighter } from 'lucide-react';
+import type { JSX } from 'react';
+
+function computeDiffTokens(inputText: string, outputText: string): JSX.Element[] {
+  const normalize = (w: string) => w.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const inputSet = new Set(
+    inputText.split(/\s+/).filter(Boolean).map(normalize)
+  );
+  return outputText.split(/(\s+)/).map((token, i) => {
+    if (/^\s+$/.test(token)) return <span key={i}>{token}</span>;
+    const isNew = !inputSet.has(normalize(token));
+    return isNew
+      ? <mark key={i} className="bg-yellow-200 dark:bg-yellow-800/60 rounded-sm px-0.5">{token}</mark>
+      : <span key={i}>{token}</span>;
+  });
+}
 
 export default function RewritePage() {
   const [inputText, setInputText] = useState('');
   const [outputText, setOutputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showDiff, setShowDiff] = useState(false);
   const [language, setLanguage] = useState<'English' | 'Swedish'>('English');
   const [stats, setStats] = useState<{
     inputTokens: number;
@@ -28,6 +44,7 @@ export default function RewritePage() {
     if (!inputText.trim()) return;
     setLoading(true);
     setOutputText('');
+    setShowDiff(false);
     setStats(null);
     try {
       const result = await api.rewrite(inputText, language);
@@ -118,18 +135,20 @@ export default function RewritePage() {
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Output</span>
             {outputText && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleCopy}
-                className="h-7 px-2 text-xs"
-              >
-                {copied ? (
-                  <><Check className="mr-1 h-3 w-3" /> Copied</>
-                ) : (
-                  <><Copy className="mr-1 h-3 w-3" /> Copy</>
-                )}
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowDiff(d => !d)}
+                  className={`h-7 px-2 text-xs ${showDiff ? 'bg-accent text-accent-foreground' : ''}`}
+                >
+                  <Highlighter className="mr-1 h-3 w-3" />
+                  Highlight changes
+                </Button>
+                <Button variant="ghost" size="sm" onClick={handleCopy} className="h-7 px-2 text-xs">
+                  {copied ? <><Check className="mr-1 h-3 w-3" />Copied</> : <><Copy className="mr-1 h-3 w-3" />Copy</>}
+                </Button>
+              </div>
             )}
           </div>
           <div className="min-h-[420px] rounded-md border border-input bg-muted/30 p-3 text-sm">
@@ -139,7 +158,13 @@ export default function RewritePage() {
                 <p className="text-sm text-muted-foreground">Analyzing your style and rewriting...</p>
               </div>
             ) : outputText ? (
-              <p className="whitespace-pre-wrap text-foreground/90 leading-relaxed">{outputText}</p>
+              showDiff ? (
+                <p className="whitespace-pre-wrap text-foreground/90 leading-relaxed">
+                  {computeDiffTokens(inputText, outputText)}
+                </p>
+              ) : (
+                <p className="whitespace-pre-wrap text-foreground/90 leading-relaxed">{outputText}</p>
+              )
             ) : (
               <p className="text-muted-foreground text-sm">
                 Your rewritten text will appear here.
