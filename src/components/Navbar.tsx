@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, Wand2, LogOut } from 'lucide-react';
+import { BookOpen, Wand2, SlidersHorizontal, LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
@@ -37,6 +37,18 @@ export default function Navbar() {
               >
                 <Wand2 className="h-4 w-4" />
                 Rewrite
+              </Link>
+              <Link
+                to="/personalise"
+                className={cn(
+                  'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                  location.pathname === '/personalise'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                )}
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                Personalise
               </Link>
             </div>
           </div>

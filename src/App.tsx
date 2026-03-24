@@ -3,6 +3,7 @@ import { Toaster } from 'sonner';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import LibraryPage from '@/pages/LibraryPage';
 import RewritePage from '@/pages/RewritePage';
+import PersonalisePage from '@/pages/PersonalisePage';
 import LoginPage from '@/pages/LoginPage';
 import Navbar from '@/components/Navbar';
 
@@ -43,6 +44,16 @@ export default function App() {
               <ProtectedRoute>
                 <AppLayout>
                   <RewritePage />
+                </AppLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/personalise"
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <PersonalisePage />
                 </AppLayout>
               </ProtectedRoute>
             }

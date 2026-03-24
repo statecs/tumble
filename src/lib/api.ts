@@ -54,6 +54,10 @@ export const api = {
 
   rewrite: (text: string) =>
     request<RewriteResult>('/api/rewrite', { method: 'POST', body: JSON.stringify({ text }) }),
+
+  getPreferences: () => request<{ preferences: string }>('/api/settings/preferences'),
+  savePreferences: (preferences: string) =>
+    request<{ preferences: string }>('/api/settings/preferences', { method: 'PUT', body: JSON.stringify({ preferences }) }),
 };
 
 export interface Category {

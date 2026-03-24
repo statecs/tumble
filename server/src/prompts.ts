@@ -32,7 +32,7 @@ export function parseCategorizationResult(text: string): CategorizationResult {
   }
 }
 
-export function buildRewriteSystem(examples: Array<{ title: string; content: string; category: string }>): string {
+export function buildRewriteSystem(examples: Array<{ title: string; content: string; category: string }>, preferences?: string): string {
   const examplesBlock = examples
     .map((ex, i) => {
       const excerpt = ex.content.slice(0, 800);
@@ -40,12 +40,16 @@ export function buildRewriteSystem(examples: Array<{ title: string; content: str
     })
     .join('\n\n');
 
+  const preferencesBlock = preferences?.trim()
+    ? `\n---\nAdditional preferences from the author:\n${preferences.trim()}\n---\n`
+    : '';
+
   return `You are a writing assistant that rewrites text to match a specific author's voice and style.
 
 Study these writing samples from the author's library carefully:
 
 ${examplesBlock}
-
+${preferencesBlock}
 When rewriting, preserve:
 - Sentence rhythm and length patterns
 - Vocabulary level and word choices

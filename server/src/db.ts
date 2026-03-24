@@ -94,6 +94,14 @@ export async function initDatabase(): Promise<void> {
       )
     `);
 
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS settings (
+        \`key\` VARCHAR(100) PRIMARY KEY,
+        value TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+
     // Seed default categories
     for (const cat of SEED_CATEGORIES) {
       await pool.execute(

@@ -369,6 +369,33 @@ app.delete('/api/texts/:id', requireApiKey, async (req, res) => {
   }
 });
 
+// ── Settings ──────────────────────────────────────────────────────────────────
+
+app.get('/api/settings/preferences', requireApiKey, async (_req, res) => {
+  try {
+    const [rows] = await pool.query<RowDataPacket[]>('SELECT value FROM settings WHERE `key` = ?', ['preferences']);
+    res.json({ preferences: rows.length > 0 ? rows[0].value : '' });
+  } catch (error) {
+    logger.error('[GET /api/settings/preferences]', error);
+    res.status(500).json({ error: 'Failed to fetch preferences' });
+  }
+});
+
+app.put('/api/settings/preferences', requireApiKey, async (req, res) => {
+  const { preferences } = req.body;
+  if (typeof preferences !== 'string') { res.status(400).json({ error: 'preferences must be a string' }); return; }
+  try {
+    await pool.execute(
+      'INSERT INTO settings (`key`, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = ?',
+      ['preferences', preferences, preferences]
+    );
+    res.json({ preferences });
+  } catch (error) {
+    logger.error('[PUT /api/settings/preferences]', error);
+    res.status(500).json({ error: 'Failed to save preferences' });
+  }
+});
+
 // ── Rewrite ───────────────────────────────────────────────────────────────────
 
 app.post('/api/rewrite', requireApiKey, async (req, res) => {
@@ -376,6 +403,10 @@ app.post('/api/rewrite', requireApiKey, async (req, res) => {
   if (!text) { res.status(400).json({ error: 'text is required' }); return; }
 
   try {
+    // Fetch preferences from DB
+    const [prefRows] = await pool.query<RowDataPacket[]>('SELECT value FROM settings WHERE `key` = ?', ['preferences']);
+    const preferences = prefRows.length > 0 ? prefRows[0].value : undefined;
+
     // Fetch 15 most recent texts
     const [textRows] = await pool.query<RowDataPacket[]>(`
       SELECT t.id, t.title, t.content,
@@ -399,7 +430,7 @@ app.post('/api/rewrite', requireApiKey, async (req, res) => {
       category: row.categories || 'other'
     }));
 
-    const systemPrompt = buildRewriteSystem(examples);
+    const systemPrompt = buildRewriteSystem(examples, preferences);
     const userMessage = buildRewriteUser(text);
 
     const result = await callClaude(systemPrompt, userMessage, 6000);
