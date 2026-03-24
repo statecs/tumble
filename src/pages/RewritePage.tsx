@@ -9,6 +9,15 @@ import { toast } from 'sonner';
 import { Loader2, Wand2, Copy, Check, Highlighter, ChevronLeft, ChevronRight, SendHorizontal } from 'lucide-react';
 import type { JSX } from 'react';
 
+const QUICK_CHIPS = [
+  'Make shorter',
+  'Make longer',
+  'More formal',
+  'More casual',
+  'Add energy',
+  'Simplify',
+] as const;
+
 function computeDiffTokens(inputText: string, outputText: string): JSX.Element[] {
   const normalize = (w: string) => w.toLowerCase().replace(/[^a-z0-9]/g, '');
   const inputSet = new Set(
@@ -70,17 +79,18 @@ export default function RewritePage() {
     }
   };
 
-  const handleIterate = async () => {
-    if (!followUpText.trim() || !outputText) return;
+  const handleIterate = async (override?: string) => {
+    const instruction = override ?? followUpText;
+    if (!instruction.trim() || !outputText) return;
     setLoading(true);
     try {
       const result = await api.rewrite(inputText, language, model, {
         previousOutput: history[historyIndex],
-        instruction: followUpText,
+        instruction,
       });
       setHistory(prev => [...prev.slice(0, historyIndex + 1), result.rewritten]);
       setHistoryIndex(prev => prev + 1);
-      setFollowUpText('');
+      if (!override) setFollowUpText('');
       setStats({
         inputTokens: result.inputTokens,
         outputTokens: result.outputTokens,
@@ -238,23 +248,39 @@ export default function RewritePage() {
             )}
           </div>
           {history.length > 0 && (
-            <div className="flex gap-2">
-              <Input
-                value={followUpText}
-                onChange={e => setFollowUpText(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleIterate()}
-                placeholder="Refine: e.g. make it shorter, add more energy..."
-                disabled={loading}
-                className="text-sm"
-              />
-              <Button
-                onClick={handleIterate}
-                disabled={loading || !followUpText.trim()}
-                size="sm"
-                className="shrink-0"
-              >
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizontal className="h-4 w-4" />}
-              </Button>
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-1.5">
+                {QUICK_CHIPS.map(chip => (
+                  <Button
+                    key={chip}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleIterate(chip)}
+                    disabled={loading}
+                    className="h-7 px-2.5 text-xs rounded-full"
+                  >
+                    {chip}
+                  </Button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={followUpText}
+                  onChange={e => setFollowUpText(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleIterate()}
+                  placeholder="Refine: e.g. make it shorter, add more energy..."
+                  disabled={loading}
+                  className="text-sm"
+                />
+                <Button
+                  onClick={() => handleIterate()}
+                  disabled={loading || !followUpText.trim()}
+                  size="sm"
+                  className="shrink-0"
+                >
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizontal className="h-4 w-4" />}
+                </Button>
+              </div>
             </div>
           )}
         </div>
