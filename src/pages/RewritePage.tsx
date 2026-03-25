@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Loader2, Wand2, Copy, Check, Highlighter, ChevronLeft, ChevronRight, SendHorizontal } from 'lucide-react';
+import { Loader2, Wand2, Copy, Check, Highlighter, ChevronLeft, ChevronRight, SendHorizontal, CornerDownLeft } from 'lucide-react';
 import type { JSX } from 'react';
 
 const QUICK_CHIPS = [
@@ -36,6 +36,7 @@ export default function RewritePage() {
   const [inputText, setInputText] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(0);
+  const [historyLabels, setHistoryLabels] = useState<string[]>([]);
   const [followUpText, setFollowUpText] = useState('');
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -60,6 +61,7 @@ export default function RewritePage() {
     setLoading(true);
     setHistory([]);
     setHistoryIndex(0);
+    setHistoryLabels([]);
     setFollowUpText('');
     setShowDiff(false);
     setStats(null);
@@ -67,6 +69,7 @@ export default function RewritePage() {
       const result = await api.rewrite(inputText, language, model);
       setHistory([result.rewritten]);
       setHistoryIndex(0);
+      setHistoryLabels(['Original']);
       setStats({
         inputTokens: result.inputTokens,
         outputTokens: result.outputTokens,
@@ -90,6 +93,7 @@ export default function RewritePage() {
       });
       setHistory(prev => [...prev.slice(0, historyIndex + 1), result.rewritten]);
       setHistoryIndex(prev => prev + 1);
+      setHistoryLabels(prev => [...prev.slice(0, historyIndex + 1), instruction]);
       if (!override) setFollowUpText('');
       setStats({
         inputTokens: result.inputTokens,
@@ -111,6 +115,18 @@ export default function RewritePage() {
   };
 
   const inputWordCount = inputText.trim().split(/\s+/).filter(Boolean).length;
+  const outputWordCount = outputText.trim().split(/\s+/).filter(Boolean).length;
+
+  const handleUseAsInput = () => {
+    if (!outputText) return;
+    setInputText(outputText);
+    setHistory([]);
+    setHistoryIndex(0);
+    setHistoryLabels([]);
+    setFollowUpText('');
+    setShowDiff(false);
+    setStats(null);
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -186,6 +202,11 @@ export default function RewritePage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Output</span>
+              {outputText && (
+                <span className="text-xs text-muted-foreground">
+                  {outputWordCount} words
+                </span>
+              )}
               {history.length > 1 && (
                 <div className="flex items-center gap-1">
                   <Button
@@ -197,7 +218,10 @@ export default function RewritePage() {
                   >
                     <ChevronLeft className="h-3 w-3" />
                   </Button>
-                  <span className="text-xs text-muted-foreground tabular-nums">{historyIndex + 1} / {history.length}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {historyIndex + 1} / {history.length}
+                    {historyLabels[historyIndex] ? ` · ${historyLabels[historyIndex]}` : ''}
+                  </span>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -220,6 +244,10 @@ export default function RewritePage() {
                 >
                   <Highlighter className="mr-1 h-3 w-3" />
                   Highlight changes
+                </Button>
+                <Button variant="ghost" size="sm" onClick={handleUseAsInput} className="h-7 px-2 text-xs">
+                  <CornerDownLeft className="mr-1 h-3 w-3" />
+                  Use as input
                 </Button>
                 <Button variant="ghost" size="sm" onClick={handleCopy} className="h-7 px-2 text-xs">
                   {copied ? <><Check className="mr-1 h-3 w-3" />Copied</> : <><Copy className="mr-1 h-3 w-3" />Copy</>}
