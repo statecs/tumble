@@ -436,7 +436,7 @@ app.post('/api/rewrite', requireApiKey, async (req, res) => {
       ? buildRewriteIterationUser(previousOutput, instruction)
       : buildRewriteUser(text);
 
-    const provider = model === 'openai' ? 'openai' : 'claude';
+    const provider = model === 'openai' ? 'openai' : model === 'fable' ? 'fable' : 'claude';
     const result = await callAI(provider, systemPrompt, userMessage, 6000);
 
     // Log to rewrite_logs

@@ -42,7 +42,7 @@ export default function RewritePage() {
   const [copied, setCopied] = useState(false);
   const [showDiff, setShowDiff] = useState(false);
   const [language, setLanguage] = useState<'English' | 'Swedish'>('English');
-  const [model, setModel] = useState<'claude' | 'openai'>('claude');
+  const [model, setModel] = useState<'claude' | 'openai' | 'fable'>('claude');
   const [stats, setStats] = useState<{
     inputTokens: number;
     outputTokens: number;
@@ -174,12 +174,13 @@ export default function RewritePage() {
                 <SelectItem value="Swedish">Swedish</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={model} onValueChange={(v) => setModel(v as 'claude' | 'openai')}>
+            <Select value={model} onValueChange={(v) => setModel(v as 'claude' | 'openai' | 'fable')}>
               <SelectTrigger className="w-40">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="claude">Claude Sonnet</SelectItem>
+                <SelectItem value="fable">Claude Fable 5</SelectItem>
                 <SelectItem value="openai">GPT</SelectItem>
               </SelectContent>
             </Select>

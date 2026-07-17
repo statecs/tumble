@@ -3,6 +3,7 @@ import { logger } from './logger';
 
 const ANTHROPIC_ENDPOINT = 'https://api.anthropic.com/v1/messages';
 const MODEL = 'claude-sonnet-4-6';
+const FABLE_MODEL = 'claude-fable-5';
 
 const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 const OPENAI_MODEL = 'gpt-5.4';
@@ -16,7 +17,8 @@ export interface ClaudeResult {
 export async function callClaude(
   systemPrompt: string,
   userMessage: string,
-  maxTokens: number = 2000
+  maxTokens: number = 2000,
+  model: string = MODEL
 ): Promise<ClaudeResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
@@ -29,7 +31,7 @@ export async function callClaude(
       'anthropic-version': '2023-06-01'
     },
     body: JSON.stringify({
-      model: MODEL,
+      model,
       max_tokens: maxTokens,
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }]
@@ -45,6 +47,11 @@ export async function callClaude(
   }
 
   const data = await response.json() as any;
+
+  if (data?.stop_reason === 'refusal') {
+    logger.error('[AI] Anthropic request refused:', JSON.stringify(data.stop_details));
+    throw new Error('The model declined to complete this rewrite. Try rephrasing the input.');
+  }
 
   if (!data?.content?.[0]?.text || !data?.usage) {
     logger.error('[AI] Unexpected response structure:', JSON.stringify(data));
@@ -105,12 +112,12 @@ export async function callOpenAI(
 }
 
 export async function callAI(
-  provider: 'claude' | 'openai',
+  provider: 'claude' | 'openai' | 'fable',
   systemPrompt: string,
   userMessage: string,
   maxTokens: number
 ): Promise<ClaudeResult> {
-  return provider === 'openai'
-    ? callOpenAI(systemPrompt, userMessage, maxTokens)
-    : callClaude(systemPrompt, userMessage, maxTokens);
+  if (provider === 'openai') return callOpenAI(systemPrompt, userMessage, maxTokens);
+  if (provider === 'fable') return callClaude(systemPrompt, userMessage, maxTokens, FABLE_MODEL);
+  return callClaude(systemPrompt, userMessage, maxTokens);
 }
