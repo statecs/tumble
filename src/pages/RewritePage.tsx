@@ -130,7 +130,7 @@ export default function RewritePage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      <div className="mb-5 flex items-start justify-between gap-4">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
           <h1 className="text-xl font-semibold">Rewrite in My Style</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -142,7 +142,7 @@ export default function RewritePage() {
           </p>
         </div>
         {stats && (
-          <div className="flex gap-2 flex-wrap justify-end shrink-0">
+          <div className="flex gap-2 flex-wrap sm:justify-end shrink-0">
             <Badge variant="secondary">Based on {stats.examplesUsed} texts</Badge>
             <Badge variant="outline">{(stats.inputTokens + stats.outputTokens).toLocaleString()} tokens</Badge>
           </div>
@@ -162,32 +162,34 @@ export default function RewritePage() {
             value={inputText}
             onChange={e => setInputText(e.target.value)}
             placeholder="Paste the text you want to rewrite in your voice..."
-            className="min-h-[420px] resize-y text-sm"
+            className="min-h-[220px] sm:min-h-[420px] resize-y text-sm"
           />
-          <div className="flex gap-2">
-            <Select value={language} onValueChange={(v) => setLanguage(v as 'English' | 'Swedish')}>
-              <SelectTrigger className="w-36">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="English">English</SelectItem>
-                <SelectItem value="Swedish">Swedish</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={model} onValueChange={(v) => setModel(v as 'claude' | 'openai' | 'fable')}>
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="claude">Claude Sonnet</SelectItem>
-                <SelectItem value="fable">Claude Fable 5</SelectItem>
-                <SelectItem value="openai">GPT</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:contents">
+              <Select value={language} onValueChange={(v) => setLanguage(v as 'English' | 'Swedish')}>
+                <SelectTrigger className="w-full sm:w-36">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="English">English</SelectItem>
+                  <SelectItem value="Swedish">Swedish</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={model} onValueChange={(v) => setModel(v as 'claude' | 'openai' | 'fable')}>
+                <SelectTrigger className="w-full sm:w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="claude">Claude Sonnet</SelectItem>
+                  <SelectItem value="fable">Claude Fable 5</SelectItem>
+                  <SelectItem value="openai">GPT</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <Button
               onClick={handleRewrite}
               disabled={loading || !inputText.trim() || libraryCount === 0}
-              className="flex-1"
+              className="w-full sm:flex-1"
             >
               {loading ? (
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Rewriting...</>
@@ -200,8 +202,8 @@ export default function RewritePage() {
 
         {/* Output panel */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-medium">Output</span>
               {outputText && (
                 <span className="text-xs text-muted-foreground">
@@ -236,7 +238,7 @@ export default function RewritePage() {
               )}
             </div>
             {outputText && (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 flex-wrap">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -256,9 +258,9 @@ export default function RewritePage() {
               </div>
             )}
           </div>
-          <div className="min-h-[420px] rounded-md border border-input bg-muted/30 p-3 text-sm">
+          <div className="min-h-[220px] sm:min-h-[420px] rounded-md border border-input bg-muted/30 p-3 text-sm">
             {loading ? (
-              <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-3">
+              <div className="flex flex-col items-center justify-center h-full min-h-[200px] sm:min-h-[400px] gap-3">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">Analyzing your style and rewriting...</p>
               </div>
