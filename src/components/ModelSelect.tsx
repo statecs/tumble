@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 const GROUPS = [
   { provider: 'anthropic' as const, label: 'Anthropic' },
   { provider: 'openai' as const, label: 'OpenAI' },
+  { provider: 'google' as const, label: 'Google' },
 ];
 
 export default function ModelSelect({

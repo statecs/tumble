@@ -1,7 +1,7 @@
 // Single source of truth for selectable models. Adding a model here is all that
 // is needed server-side; the frontend list in src/lib/models.ts must match.
 
-export type Provider = 'anthropic' | 'openai';
+export type Provider = 'anthropic' | 'openai' | 'google';
 
 export interface ModelSpec {
   /** Stable id used on the wire and stored in the UI. */
@@ -22,6 +22,14 @@ export const MODELS: ModelSpec[] = [
   { id: 'claude-fable-5-1', label: 'Claude Fable 5.1', provider: 'anthropic', apiModel: 'claude-fable-5-1' },
   { id: 'gpt-5-4', label: 'GPT-5.4', provider: 'openai', apiModel: 'gpt-5.4' },
   { id: 'gpt-5-6-sol', label: 'GPT-5.6 Sol', provider: 'openai', apiModel: 'gpt-5.6-sol' },
+  { id: 'gemini-3-8-flash', label: 'Gemini 3.8 Flash', provider: 'google', apiModel: 'gemini-3.8-flash' },
+  {
+    id: 'gemini-3-1-pro',
+    label: 'Gemini 3.1 Pro',
+    provider: 'google',
+    apiModel: 'gemini-3.1-pro-preview',
+    gated: 'Gemini 3.1 Pro is preview-only; your key may not have access.'
+  },
   {
     id: 'gpt-6-astra',
     label: 'GPT-6 Astra',
