@@ -10,6 +10,8 @@ export interface ModelOption {
 
 export const MODELS: ModelOption[] = [
   { id: 'claude-sonnet', label: 'Claude Sonnet 4.6', provider: 'anthropic' },
+  { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', provider: 'anthropic' },
+  { id: 'claude-opus-5', label: 'Claude Opus 5', provider: 'anthropic' },
   { id: 'claude-fable', label: 'Claude Fable 5', provider: 'anthropic' },
   { id: 'claude-fable-5-1', label: 'Claude Fable 5.1', provider: 'anthropic' },
   { id: 'gpt-5-4', label: 'GPT-5.4', provider: 'openai' },

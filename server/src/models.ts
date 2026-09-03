@@ -16,6 +16,8 @@ export interface ModelSpec {
 
 export const MODELS: ModelSpec[] = [
   { id: 'claude-sonnet', label: 'Claude Sonnet 4.6', provider: 'anthropic', apiModel: 'claude-sonnet-4-6' },
+  { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', provider: 'anthropic', apiModel: 'claude-sonnet-5' },
+  { id: 'claude-opus-5', label: 'Claude Opus 5', provider: 'anthropic', apiModel: 'claude-opus-5' },
   { id: 'claude-fable', label: 'Claude Fable 5', provider: 'anthropic', apiModel: 'claude-fable-5' },
   { id: 'claude-fable-5-1', label: 'Claude Fable 5.1', provider: 'anthropic', apiModel: 'claude-fable-5-1' },
   { id: 'gpt-5-4', label: 'GPT-5.4', provider: 'openai', apiModel: 'gpt-5.4' },
