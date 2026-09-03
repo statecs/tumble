@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, Wand2, SlidersHorizontal, LogOut } from 'lucide-react';
+import { BookOpen, Wand2, SlidersHorizontal, MessageSquare, LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
@@ -14,6 +14,18 @@ export default function Navbar() {
           <div className="flex items-center gap-2 sm:gap-6 min-w-0">
             <span className="font-semibold text-lg tracking-tight shrink-0">Tumble</span>
             <div className="flex gap-0.5 sm:gap-1 min-w-0">
+              <Link
+                to="/chat"
+                className={cn(
+                  'flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                  location.pathname === '/chat'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                )}
+              >
+                <MessageSquare className="h-4 w-4 shrink-0" />
+                <span className="hidden sm:inline">Chat</span>
+              </Link>
               <Link
                 to="/rewrite"
                 className={cn(

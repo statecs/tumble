@@ -3,6 +3,7 @@ import { Toaster } from 'sonner';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import LibraryPage from '@/pages/LibraryPage';
 import RewritePage from '@/pages/RewritePage';
+import ChatPage from '@/pages/ChatPage';
 import PersonalisePage from '@/pages/PersonalisePage';
 import LoginPage from '@/pages/LoginPage';
 import Navbar from '@/components/Navbar';
@@ -34,6 +35,16 @@ export default function App() {
               <ProtectedRoute>
                 <AppLayout>
                   <LibraryPage />
+                </AppLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/chat"
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <ChatPage />
                 </AppLayout>
               </ProtectedRoute>
             }

@@ -55,6 +55,9 @@ export const api = {
   rewrite: (text: string, language: string, model: string, iteration?: { previousOutput: string; instruction: string }) =>
     request<RewriteResult>('/api/rewrite', { method: 'POST', body: JSON.stringify({ text, language, model, ...iteration }) }),
 
+  chat: (messages: ChatMessage[], model: string) =>
+    request<ChatResult>('/api/chat', { method: 'POST', body: JSON.stringify({ messages, model }) }),
+
   getPreferences: () => request<{ preferences: string }>('/api/settings/preferences'),
   savePreferences: (preferences: string) =>
     request<{ preferences: string }>('/api/settings/preferences', { method: 'PUT', body: JSON.stringify({ preferences }) }),
@@ -94,6 +97,17 @@ export interface TextsResponse {
   page: number;
   limit: number;
   totalPages: number;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatResult {
+  reply: string;
+  inputTokens: number;
+  outputTokens: number;
 }
 
 export interface RewriteResult {

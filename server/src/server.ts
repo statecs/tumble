@@ -3,14 +3,15 @@ import cors from 'cors';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { pool, initDatabase, RowDataPacket, ResultSetHeader } from './db';
-import { callClaude, callAI } from './ai';
+import { callClaude, callAI, callAIChat, ChatMessage } from './ai';
 import {
   buildCategorizationSystem,
   buildCategorizationUser,
   parseCategorizationResult,
   buildRewriteSystem,
   buildRewriteUser,
-  buildRewriteIterationUser
+  buildRewriteIterationUser,
+  buildChatSystem
 } from './prompts';
 import { logger } from './logger';
 
@@ -454,6 +455,40 @@ app.post('/api/rewrite', requireApiKey, async (req, res) => {
   } catch (error) {
     logger.error('[POST /api/rewrite]', error);
     res.status(500).json({ error: 'Failed to rewrite text' });
+  }
+});
+
+// ── Chat ──────────────────────────────────────────────────────────────────────
+
+app.post('/api/chat', requireApiKey, async (req, res) => {
+  const { messages, model = 'claude' } = req.body;
+
+  if (!Array.isArray(messages) || messages.length === 0) {
+    res.status(400).json({ error: 'messages is required' });
+    return;
+  }
+
+  const cleaned: ChatMessage[] = messages
+    .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
+    .map((m: any) => ({ role: m.role, content: m.content }));
+
+  if (cleaned.length === 0 || cleaned[cleaned.length - 1].role !== 'user') {
+    res.status(400).json({ error: 'messages must end with a user message' });
+    return;
+  }
+
+  try {
+    const provider = model === 'openai' ? 'openai' : model === 'fable' ? 'fable' : 'claude';
+    const result = await callAIChat(provider, buildChatSystem(), cleaned, 4000);
+
+    res.json({
+      reply: result.outputText,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens
+    });
+  } catch (error) {
+    logger.error('[POST /api/chat]', error);
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Chat request failed' });
   }
 });
 

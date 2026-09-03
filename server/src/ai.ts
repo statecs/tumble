@@ -121,3 +121,118 @@ export async function callAI(
   if (provider === 'fable') return callClaude(systemPrompt, userMessage, maxTokens, FABLE_MODEL);
   return callClaude(systemPrompt, userMessage, maxTokens);
 }
+
+// ─── Multi-turn chat ──────────────────────────────────────────────────────────
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export async function callClaudeChat(
+  systemPrompt: string,
+  messages: ChatMessage[],
+  maxTokens: number = 2000,
+  model: string = MODEL
+): Promise<ClaudeResult> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
+
+  const response = await fetch(ANTHROPIC_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Api-Key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages: messages.map(m => ({ role: m.role, content: m.content }))
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorData: any;
+    try { errorData = JSON.parse(errorText); } catch { errorData = { message: errorText }; }
+    logger.error(`[AI] Anthropic API error ${response.status}:`, JSON.stringify(errorData));
+    throw new Error(`Anthropic API error (${response.status}): ${errorData.error?.message || errorData.message || 'Request failed'}`);
+  }
+
+  const data = await response.json() as any;
+
+  if (data?.stop_reason === 'refusal') {
+    logger.error('[AI] Anthropic request refused:', JSON.stringify(data.stop_details));
+    throw new Error('The model declined to answer that. Try rephrasing.');
+  }
+
+  if (!data?.content?.[0]?.text || !data?.usage) {
+    logger.error('[AI] Unexpected response structure:', JSON.stringify(data));
+    throw new Error('Anthropic API returned unexpected response structure');
+  }
+
+  return {
+    outputText: data.content[0].text,
+    inputTokens: data.usage.input_tokens,
+    outputTokens: data.usage.output_tokens
+  };
+}
+
+export async function callOpenAIChat(
+  systemPrompt: string,
+  messages: ChatMessage[],
+  maxTokens: number = 2000
+): Promise<ClaudeResult> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error('OPENAI_API_KEY not set');
+
+  const response = await fetch(OPENAI_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      max_completion_tokens: maxTokens,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages.map(m => ({ role: m.role, content: m.content }))
+      ]
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorData: any;
+    try { errorData = JSON.parse(errorText); } catch { errorData = { message: errorText }; }
+    logger.error(`[AI] OpenAI API error ${response.status}:`, JSON.stringify(errorData));
+    throw new Error(`OpenAI API error (${response.status}): ${errorData.error?.message || errorData.message || 'Request failed'}`);
+  }
+
+  const data = await response.json() as any;
+
+  if (!data?.choices?.[0]?.message?.content || !data?.usage) {
+    logger.error('[AI] Unexpected OpenAI response structure:', JSON.stringify(data));
+    throw new Error('OpenAI API returned unexpected response structure');
+  }
+
+  return {
+    outputText: data.choices[0].message.content,
+    inputTokens: data.usage.prompt_tokens,
+    outputTokens: data.usage.completion_tokens
+  };
+}
+
+export async function callAIChat(
+  provider: 'claude' | 'openai' | 'fable',
+  systemPrompt: string,
+  messages: ChatMessage[],
+  maxTokens: number
+): Promise<ClaudeResult> {
+  if (provider === 'openai') return callOpenAIChat(systemPrompt, messages, maxTokens);
+  if (provider === 'fable') return callClaudeChat(systemPrompt, messages, maxTokens, FABLE_MODEL);
+  return callClaudeChat(systemPrompt, messages, maxTokens);
+}
