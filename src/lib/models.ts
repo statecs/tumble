@@ -17,12 +17,7 @@ export const MODELS: ModelOption[] = [
   { id: 'gpt-5-4', label: 'GPT-5.4', provider: 'openai' },
   { id: 'gpt-5-6-sol', label: 'GPT-5.6 Sol', provider: 'openai' },
   { id: 'gemini-3-8-flash', label: 'Gemini 3.8 Flash', provider: 'google' },
-  {
-    id: 'gemini-3-1-pro',
-    label: 'Gemini 3.1 Pro',
-    provider: 'google',
-    gated: 'Preview-only — your key may not have access yet.'
-  },
+  { id: 'gemini-3-1-pro', label: 'Gemini 3.1 Pro', provider: 'google' },
   {
     id: 'gpt-6-astra',
     label: 'GPT-6 Astra',

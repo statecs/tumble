@@ -166,13 +166,13 @@ async function callGemini(
     const raw = await response.text();
     logger.error(`[AI] Gemini API error ${response.status} (${spec.apiModel}):`, raw || '(empty body)');
 
-    // A credential that authenticates but cannot generate content gets a 404
-    // with no body at all - metadata calls still succeed, which makes this
-    // very hard to read without the hint. Live API ephemeral tokens ("AQ....")
-    // behave this way; content generation needs an AI Studio key ("AIza...").
+    // A newly created key returns a 404 with no body at all until generateContent
+    // is enabled for it, which lags the metadata endpoints by several minutes -
+    // listing models and countTokens succeed the whole time, so the cause is
+    // otherwise unreadable. It clears on its own.
     if (response.status === 404 && !raw.trim()) {
       throw new Error(
-        'Gemini rejected the request: GEMINI_API_KEY authenticates but is not authorized to generate content. Use a Google AI Studio API key (starts with "AIza").'
+        `${spec.label} is not answering yet. A newly created GEMINI_API_KEY takes a few minutes before content generation is enabled - retry shortly.`
       );
     }
 
@@ -193,6 +193,7 @@ async function callGemini(
 
   const candidate = data?.candidates?.[0];
   const text = (candidate?.content?.parts ?? [])
+    .filter((p: any) => p?.thought !== true)
     .map((p: any) => p?.text)
     .filter(Boolean)
     .join('');
@@ -210,10 +211,11 @@ async function callGemini(
     throw new Error('Gemini API returned unexpected response structure');
   }
 
+  const usage = data?.usageMetadata ?? {};
   return {
     outputText: text,
-    inputTokens: data?.usageMetadata?.promptTokenCount ?? 0,
-    outputTokens: data?.usageMetadata?.candidatesTokenCount ?? 0
+    inputTokens: usage.promptTokenCount ?? 0,
+    outputTokens: (usage.candidatesTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0)
   };
 }
 
