@@ -5,6 +5,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import ModelSelect from '@/components/ModelSelect';
+import { DEFAULT_MODEL_ID } from '@/lib/models';
 import { toast } from 'sonner';
 import { Loader2, Wand2, Copy, Check, Highlighter, ChevronLeft, ChevronRight, SendHorizontal, CornerDownLeft } from 'lucide-react';
 import type { JSX } from 'react';
@@ -42,7 +44,7 @@ export default function RewritePage() {
   const [copied, setCopied] = useState(false);
   const [showDiff, setShowDiff] = useState(false);
   const [language, setLanguage] = useState<'English' | 'Swedish'>('English');
-  const [model, setModel] = useState<'claude' | 'openai' | 'fable'>('claude');
+  const [model, setModel] = useState<string>(DEFAULT_MODEL_ID);
   const [stats, setStats] = useState<{
     inputTokens: number;
     outputTokens: number;
@@ -175,16 +177,7 @@ export default function RewritePage() {
                   <SelectItem value="Swedish">Swedish</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={model} onValueChange={(v) => setModel(v as 'claude' | 'openai' | 'fable')}>
-                <SelectTrigger className="w-full sm:w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="claude">Claude Sonnet</SelectItem>
-                  <SelectItem value="fable">Claude Fable 5</SelectItem>
-                  <SelectItem value="openai">GPT</SelectItem>
-                </SelectContent>
-              </Select>
+              <ModelSelect value={model} onChange={setModel} disabled={loading} className="w-full sm:w-48" />
             </div>
             <Button
               onClick={handleRewrite}

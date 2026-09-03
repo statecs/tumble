@@ -4,7 +4,8 @@ import type { ChatMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import ModelSelect from '@/components/ModelSelect';
+import { DEFAULT_MODEL_ID } from '@/lib/models';
 import { toast } from 'sonner';
 import { Loader2, SendHorizontal, Copy, Check, Trash2, MessageSquare } from 'lucide-react';
 
@@ -19,7 +20,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [model, setModel] = useState<'claude' | 'openai' | 'fable'>('claude');
+  const [model, setModel] = useState<string>(DEFAULT_MODEL_ID);
   const [tokens, setTokens] = useState(0);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -74,16 +75,7 @@ export default function ChatPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap sm:justify-end shrink-0">
           {tokens > 0 && <Badge variant="outline">{tokens.toLocaleString()} tokens</Badge>}
-          <Select value={model} onValueChange={(v) => setModel(v as 'claude' | 'openai' | 'fable')}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="claude">Claude Sonnet</SelectItem>
-              <SelectItem value="fable">Claude Fable 5</SelectItem>
-              <SelectItem value="openai">GPT</SelectItem>
-            </SelectContent>
-          </Select>
+          <ModelSelect value={model} onChange={setModel} disabled={loading} className="w-48" />
           {messages.length > 0 && (
             <Button variant="ghost" size="sm" onClick={handleClear} className="h-9 px-2 text-xs">
               <Trash2 className="mr-1 h-3 w-3" />

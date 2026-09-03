@@ -3,7 +3,8 @@ import cors from 'cors';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { pool, initDatabase, RowDataPacket, ResultSetHeader } from './db';
-import { callClaude, callAI, callAIChat, ChatMessage } from './ai';
+import { callAI, callAIChat, ChatMessage } from './ai';
+import { MODELS, DEFAULT_MODEL_ID } from './models';
 import {
   buildCategorizationSystem,
   buildCategorizationUser,
@@ -145,7 +146,8 @@ app.post('/api/texts', requireApiKey, async (req, res) => {
     let categoryName = 'other';
     let suggestedTags: string[] = [];
     try {
-      const result = await callClaude(
+      const result = await callAI(
+        DEFAULT_MODEL_ID,
         buildCategorizationSystem(),
         buildCategorizationUser(content),
         500
@@ -401,7 +403,7 @@ app.put('/api/settings/preferences', requireApiKey, async (req, res) => {
 // ── Rewrite ───────────────────────────────────────────────────────────────────
 
 app.post('/api/rewrite', requireApiKey, async (req, res) => {
-  const { text, language = 'English', model = 'claude', previousOutput, instruction } = req.body;
+  const { text, language = 'English', model, previousOutput, instruction } = req.body;
   if (!text) { res.status(400).json({ error: 'text is required' }); return; }
 
   try {
@@ -437,8 +439,7 @@ app.post('/api/rewrite', requireApiKey, async (req, res) => {
       ? buildRewriteIterationUser(previousOutput, instruction)
       : buildRewriteUser(text);
 
-    const provider = model === 'openai' ? 'openai' : model === 'fable' ? 'fable' : 'claude';
-    const result = await callAI(provider, systemPrompt, userMessage, 6000);
+    const result = await callAI(model, systemPrompt, userMessage, 6000);
 
     // Log to rewrite_logs
     await pool.execute(
@@ -454,14 +455,23 @@ app.post('/api/rewrite', requireApiKey, async (req, res) => {
     });
   } catch (error) {
     logger.error('[POST /api/rewrite]', error);
-    res.status(500).json({ error: 'Failed to rewrite text' });
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to rewrite text' });
   }
+});
+
+// ── Models ────────────────────────────────────────────────────────────────────
+
+app.get('/api/models', requireApiKey, (_req, res) => {
+  res.json({
+    models: MODELS.map(({ id, label, provider, gated }) => ({ id, label, provider, gated })),
+    defaultModel: DEFAULT_MODEL_ID
+  });
 });
 
 // ── Chat ──────────────────────────────────────────────────────────────────────
 
 app.post('/api/chat', requireApiKey, async (req, res) => {
-  const { messages, model = 'claude' } = req.body;
+  const { messages, model } = req.body;
 
   if (!Array.isArray(messages) || messages.length === 0) {
     res.status(400).json({ error: 'messages is required' });
@@ -478,8 +488,7 @@ app.post('/api/chat', requireApiKey, async (req, res) => {
   }
 
   try {
-    const provider = model === 'openai' ? 'openai' : model === 'fable' ? 'fable' : 'claude';
-    const result = await callAIChat(provider, buildChatSystem(), cleaned, 4000);
+    const result = await callAIChat(model, buildChatSystem(), cleaned, 4000);
 
     res.json({
       reply: result.outputText,
