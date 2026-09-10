@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import ModelSelect from '@/components/ModelSelect';
 import { DEFAULT_MODEL_ID } from '@/lib/models';
 import { toast } from 'sonner';
-import { Loader2, SendHorizontal, Copy, Check, Trash2, MessageSquare } from 'lucide-react';
+import { Loader2, SendHorizontal, Copy, Check, Trash2, MessageSquare, History } from 'lucide-react';
 
 const SUGGESTIONS = [
   'Help me brainstorm ideas for a post',
@@ -16,18 +16,74 @@ const SUGGESTIONS = [
   'Give me feedback on this argument',
 ] as const;
 
+const STORAGE_KEY = 'tumble_chat_last';
+
+interface StoredChat {
+  messages: ChatMessage[];
+  model: string;
+  tokens: number;
+  updatedAt: number;
+}
+
+/** The last conversation, or null when there is none / storage is unavailable. */
+function loadChat(): StoredChat | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StoredChat;
+    if (!Array.isArray(parsed.messages) || parsed.messages.length === 0) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function formatSaved(ts: number): string {
+  const mins = Math.round((Date.now() - ts) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return new Date(ts).toLocaleDateString();
+}
+
+/**
+ * Soft keyboards have no Shift+Enter, so Enter-to-send leaves no way to add a
+ * line break. On touch devices Enter stays a plain newline and the button sends.
+ */
+function isTouchDevice(): boolean {
+  return typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
+}
+
 export default function ChatPage() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [restored] = useState(loadChat);
+  const [touch] = useState(isTouchDevice);
+  const [messages, setMessages] = useState<ChatMessage[]>(restored?.messages ?? []);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [model, setModel] = useState<string>(DEFAULT_MODEL_ID);
-  const [tokens, setTokens] = useState(0);
+  const [model, setModel] = useState<string>(restored?.model ?? DEFAULT_MODEL_ID);
+  const [tokens, setTokens] = useState(restored?.tokens ?? 0);
+  const [restoredAt, setRestoredAt] = useState<number | null>(restored?.updatedAt ?? null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, loading]);
+
+  // Keep the last conversation around across reloads.
+  useEffect(() => {
+    try {
+      if (messages.length === 0) {
+        localStorage.removeItem(STORAGE_KEY);
+        return;
+      }
+      const stored: StoredChat = { messages, model, tokens, updatedAt: Date.now() };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+    } catch {
+      // Full or unavailable storage (private mode) — the chat just won't persist.
+    }
+  }, [messages, model, tokens]);
 
   const send = async (override?: string) => {
     const content = (override ?? input).trim();
@@ -36,6 +92,7 @@ export default function ChatPage() {
     const next: ChatMessage[] = [...messages, { role: 'user', content }];
     setMessages(next);
     setInput('');
+    setRestoredAt(null);
     setLoading(true);
 
     try {
@@ -62,6 +119,7 @@ export default function ChatPage() {
     setMessages([]);
     setInput('');
     setTokens(0);
+    setRestoredAt(null);
   };
 
   return (
@@ -74,6 +132,12 @@ export default function ChatPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap sm:justify-end shrink-0">
+          {restoredAt !== null && (
+            <Badge variant="outline" className="gap-1 font-normal text-muted-foreground">
+              <History className="h-3 w-3" />
+              Last conversation · {formatSaved(restoredAt)}
+            </Badge>
+          )}
           {tokens > 0 && <Badge variant="outline">{tokens.toLocaleString()} tokens</Badge>}
           <ModelSelect value={model} onChange={setModel} disabled={loading} className="w-48" />
           {messages.length > 0 && (
@@ -156,12 +220,17 @@ export default function ChatPage() {
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === 'Enter' && !e.shiftKey && !touch) {
               e.preventDefault();
               send();
             }
           }}
-          placeholder="Send a message... (Enter to send, Shift+Enter for a new line)"
+          enterKeyHint={touch ? 'enter' : 'send'}
+          placeholder={
+            touch
+              ? 'Send a message... (Return adds a new line)'
+              : 'Send a message... (Enter to send, Shift+Enter for a new line)'
+          }
           className="min-h-[52px] max-h-40 resize-y text-sm"
         />
         <Button onClick={() => send()} disabled={loading || !input.trim()} className="shrink-0 h-[52px]">
