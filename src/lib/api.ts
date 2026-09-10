@@ -55,8 +55,16 @@ export const api = {
   rewrite: (text: string, language: string, model: string, iteration?: { previousOutput: string; instruction: string }) =>
     request<RewriteResult>('/api/rewrite', { method: 'POST', body: JSON.stringify({ text, language, model, ...iteration }) }),
 
-  chat: (messages: ChatMessage[], model: string) =>
-    request<ChatResult>('/api/chat', { method: 'POST', body: JSON.stringify({ messages, model }) }),
+  chat: (messages: ChatMessage[], model: string, conversationId?: string) =>
+    request<ChatResult>('/api/chat', { method: 'POST', body: JSON.stringify({ messages, model, conversationId }) }),
+
+  getConversations: (limit?: number) =>
+    request<ConversationSummary[]>(`/api/conversations${limit ? `?limit=${limit}` : ''}`),
+  getConversation: (id: string) => request<Conversation>(`/api/conversations/${id}`),
+  renameConversation: (id: string, title: string) =>
+    request<{ id: string; title: string }>(`/api/conversations/${id}`, { method: 'PUT', body: JSON.stringify({ title }) }),
+  deleteConversation: (id: string) =>
+    request<{ success: boolean }>(`/api/conversations/${id}`, { method: 'DELETE' }),
 
   getPreferences: () => request<{ preferences: string }>('/api/settings/preferences'),
   savePreferences: (preferences: string) =>
@@ -108,6 +116,26 @@ export interface ChatResult {
   reply: string;
   inputTokens: number;
   outputTokens: number;
+  /** Null when the reply came back but saving it failed. */
+  conversationId: string | null;
+  title: string | null;
+}
+
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  model: string | null;
+  input_tokens: number;
+  output_tokens: number;
+  message_count: number;
+  created_at: string;
+  updated_at: string;
+  /** Epoch seconds — the datetime strings carry no timezone. */
+  updated_ts: number;
+}
+
+export interface Conversation extends Omit<ConversationSummary, 'message_count'> {
+  messages: ChatMessage[];
 }
 
 export interface RewriteResult {

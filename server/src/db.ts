@@ -95,6 +95,31 @@ export async function initDatabase(): Promise<void> {
     `);
 
     await pool.execute(`
+      CREATE TABLE IF NOT EXISTS conversations (
+        id CHAR(36) PRIMARY KEY,
+        title VARCHAR(500) NOT NULL,
+        model VARCHAR(100),
+        input_tokens INT DEFAULT 0,
+        output_tokens INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS conversation_messages (
+        id CHAR(36) PRIMARY KEY,
+        conversation_id CHAR(36) NOT NULL,
+        role ENUM('user', 'assistant') NOT NULL,
+        content LONGTEXT NOT NULL,
+        \`position\` INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+        INDEX idx_conversation_position (conversation_id, \`position\`)
+      )
+    `);
+
+    await pool.execute(`
       CREATE TABLE IF NOT EXISTS settings (
         \`key\` VARCHAR(100) PRIMARY KEY,
         value TEXT,
