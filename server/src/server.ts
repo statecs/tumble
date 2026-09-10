@@ -471,7 +471,7 @@ app.get('/api/models', requireApiKey, (_req, res) => {
 // ── Chat ──────────────────────────────────────────────────────────────────────
 
 app.post('/api/chat', requireApiKey, async (req, res) => {
-  const { messages, model } = req.body;
+  const { messages, model, conversationId } = req.body;
 
   if (!Array.isArray(messages) || messages.length === 0) {
     res.status(400).json({ error: 'messages is required' });
@@ -490,16 +490,196 @@ app.post('/api/chat', requireApiKey, async (req, res) => {
   try {
     const result = await callAIChat(model, buildChatSystem(), cleaned, 4000);
 
+    // A failed write must not cost the user the reply, so persistence is
+    // best-effort and the turn is returned either way.
+    let saved: { id: string; title: string } | null = null;
+    try {
+      saved = await persistChatTurn({
+        conversationId: typeof conversationId === 'string' ? conversationId : undefined,
+        messages: cleaned,
+        reply: result.outputText,
+        model,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens
+      });
+    } catch (error) {
+      logger.error('[POST /api/chat] failed to save conversation', error);
+    }
+
     res.json({
       reply: result.outputText,
       inputTokens: result.inputTokens,
-      outputTokens: result.outputTokens
+      outputTokens: result.outputTokens,
+      conversationId: saved?.id ?? null,
+      title: saved?.title ?? null
     });
   } catch (error) {
     logger.error('[POST /api/chat]', error);
     res.status(500).json({ error: error instanceof Error ? error.message : 'Chat request failed' });
   }
 });
+
+// ── Conversations ─────────────────────────────────────────────────────────────
+
+app.get('/api/conversations', requireApiKey, async (req, res) => {
+  try {
+    const requested = parseInt(req.query.limit as string || '50');
+    const limit = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 200) : 50;
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT c.id, c.title, c.model, c.input_tokens, c.output_tokens, c.created_at, c.updated_at,
+              UNIX_TIMESTAMP(c.updated_at) AS updated_ts,
+              COUNT(m.id) AS message_count
+       FROM conversations c
+       LEFT JOIN conversation_messages m ON m.conversation_id = c.id
+       GROUP BY c.id
+       ORDER BY c.updated_at DESC
+       LIMIT ?`,
+      [limit]
+    );
+    res.json(rows);
+  } catch (error) {
+    logger.error('[GET /api/conversations]', error);
+    res.status(500).json({ error: 'Failed to fetch conversations' });
+  }
+});
+
+app.get('/api/conversations/:id', requireApiKey, async (req, res) => {
+  try {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      'SELECT *, UNIX_TIMESTAMP(updated_at) AS updated_ts FROM conversations WHERE id = ?',
+      [req.params.id]
+    );
+    if (rows.length === 0) { res.status(404).json({ error: 'Conversation not found' }); return; }
+
+    const [messages] = await pool.query<RowDataPacket[]>(
+      'SELECT role, content FROM conversation_messages WHERE conversation_id = ? ORDER BY `position` ASC',
+      [req.params.id]
+    );
+    res.json({ ...rows[0], messages });
+  } catch (error) {
+    logger.error('[GET /api/conversations/:id]', error);
+    res.status(500).json({ error: 'Failed to fetch conversation' });
+  }
+});
+
+app.put('/api/conversations/:id', requireApiKey, async (req, res) => {
+  const { title } = req.body;
+  if (typeof title !== 'string' || !title.trim()) {
+    res.status(400).json({ error: 'title is required' });
+    return;
+  }
+
+  try {
+    const [result] = await pool.execute<ResultSetHeader>(
+      'UPDATE conversations SET title = ? WHERE id = ?',
+      [title.trim().slice(0, 500), req.params.id]
+    );
+    if (result.affectedRows === 0) { res.status(404).json({ error: 'Conversation not found' }); return; }
+    res.json({ id: req.params.id, title: title.trim().slice(0, 500) });
+  } catch (error) {
+    logger.error('[PUT /api/conversations/:id]', error);
+    res.status(500).json({ error: 'Failed to rename conversation' });
+  }
+});
+
+app.delete('/api/conversations/:id', requireApiKey, async (req, res) => {
+  try {
+    const [result] = await pool.execute<ResultSetHeader>(
+      'DELETE FROM conversations WHERE id = ?',
+      [req.params.id]
+    );
+    if (result.affectedRows === 0) { res.status(404).json({ error: 'Conversation not found' }); return; }
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('[DELETE /api/conversations/:id]', error);
+    res.status(500).json({ error: 'Failed to delete conversation' });
+  }
+});
+
+// ─── Helper: persist a chat turn ──────────────────────────────────────────────
+
+function deriveTitle(text: string): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  if (!flat) return 'New conversation';
+  return flat.length > 60 ? `${flat.slice(0, 60)}…` : flat;
+}
+
+/**
+ * Appends the turn to its conversation, creating one on the first message.
+ * Only messages the row does not already hold are written, so a client that
+ * has drifted from the stored history re-syncs instead of duplicating turns.
+ */
+async function persistChatTurn(opts: {
+  conversationId?: string;
+  messages: ChatMessage[];
+  reply: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+}): Promise<{ id: string; title: string }> {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    let existing: RowDataPacket | undefined;
+    if (opts.conversationId) {
+      const [rows] = await conn.query<RowDataPacket[]>(
+        'SELECT id, title FROM conversations WHERE id = ? FOR UPDATE',
+        [opts.conversationId]
+      );
+      existing = rows[0];
+    }
+
+    let id: string;
+    let title: string;
+    let stored = 0;
+
+    if (existing) {
+      // A conversation deleted in another tab falls through to a fresh row.
+      id = existing.id;
+      title = existing.title;
+      const [counts] = await conn.query<RowDataPacket[]>(
+        'SELECT COUNT(*) AS total FROM conversation_messages WHERE conversation_id = ?',
+        [id]
+      );
+      stored = counts[0].total;
+      await conn.execute(
+        `UPDATE conversations
+         SET model = ?, input_tokens = input_tokens + ?, output_tokens = output_tokens + ?
+         WHERE id = ?`,
+        [opts.model || null, opts.inputTokens, opts.outputTokens, id]
+      );
+    } else {
+      id = generateId();
+      title = deriveTitle(opts.messages[0].content);
+      await conn.execute(
+        `INSERT INTO conversations (id, title, model, input_tokens, output_tokens)
+         VALUES (?, ?, ?, ?, ?)`,
+        [id, title, opts.model || null, opts.inputTokens, opts.outputTokens]
+      );
+    }
+
+    const pending: ChatMessage[] = [
+      ...opts.messages.slice(stored),
+      { role: 'assistant', content: opts.reply }
+    ];
+    for (let i = 0; i < pending.length; i++) {
+      await conn.execute(
+        `INSERT INTO conversation_messages (id, conversation_id, role, content, \`position\`)
+         VALUES (?, ?, ?, ?, ?)`,
+        [generateId(), id, pending[i].role, pending[i].content, stored + i]
+      );
+    }
+
+    await conn.commit();
+    return { id, title };
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
 
 // ─── Helper: get full text with relations ─────────────────────────────────────
 
