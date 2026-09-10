@@ -29,6 +29,18 @@ const SEED_CATEGORIES = [
   { id: 'cat-other',           name: 'other',           description: 'Miscellaneous content',    color: '#6B7280' },
 ];
 
+/** MySQL has no ADD COLUMN IF NOT EXISTS, so check before altering. */
+async function ensureColumn(table: string, column: string, definition: string): Promise<void> {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT 1 FROM information_schema.columns
+     WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?`,
+    [table, column]
+  );
+  if (rows.length > 0) return;
+  await pool.query(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`);
+  logger.log(`[DB] Added column ${table}.${column}`);
+}
+
 export async function initDatabase(): Promise<void> {
   try {
     await pool.execute(`
@@ -99,6 +111,7 @@ export async function initDatabase(): Promise<void> {
         id CHAR(36) PRIMARY KEY,
         title VARCHAR(500) NOT NULL,
         model VARCHAR(100),
+        styled TINYINT(1) DEFAULT 0,
         input_tokens INT DEFAULT 0,
         output_tokens INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -126,6 +139,8 @@ export async function initDatabase(): Promise<void> {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `);
+
+    await ensureColumn('conversations', 'styled', 'TINYINT(1) DEFAULT 0');
 
     // Seed default categories
     for (const cat of SEED_CATEGORIES) {

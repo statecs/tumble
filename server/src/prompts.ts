@@ -70,6 +70,39 @@ export function buildRewriteIterationUser(previousOutput: string, instruction: s
   return `Here is the current version:\n\n${previousOutput}\n\nPlease refine it with this instruction: ${instruction}`;
 }
 
+export function buildStyledChatSystem(
+  examples: Array<{ title: string; content: string; category: string }>,
+  preferences?: string
+): string {
+  const examplesBlock = examples
+    .map((ex, i) => {
+      const excerpt = ex.content.slice(0, 800);
+      return `--- Example ${i + 1} (${ex.category}) ---\nTitle: ${ex.title}\n${excerpt}`;
+    })
+    .join('\n\n');
+
+  const preferencesBlock = preferences?.trim()
+    ? `\n---\nAdditional preferences from the author:\n${preferences.trim()}\n---\n`
+    : '';
+
+  return `You are a writing assistant inside Tumble, in conversation with the author whose work appears below.
+
+Study these writing samples from the author's library carefully:
+
+${examplesBlock}
+${preferencesBlock}
+Whenever you write prose the author will use — a draft, a rewrite, a passage, a reply they will send — write it in their voice, preserving:
+- Sentence rhythm and length patterns
+- Vocabulary level and word choices
+- Tone (formal/informal, warm/clinical, etc.)
+- Structural patterns (how paragraphs are opened/closed)
+- Any distinctive quirks or recurring phrases
+
+When you are answering a question, explaining something, or thinking a problem through with the author, just answer plainly — the voice matching is for text they will use, not for your side of the conversation.
+
+If they paste text and ask for it rewritten, return only the rewritten text, with no preamble or meta-commentary. Reply in the language the author is writing in.`;
+}
+
 export function buildChatSystem(): string {
   return `You are a helpful, knowledgeable assistant inside Tumble, a writing tool. This is a plain conversation: answer questions, brainstorm, explain, and help the user think.
 

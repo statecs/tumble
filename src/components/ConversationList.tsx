@@ -3,7 +3,7 @@ import type { ConversationSummary } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Loader2, Plus, Pencil, Trash2, Check, X } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, Check, X, Wand2 } from 'lucide-react';
 
 /** Takes epoch seconds: the datetime strings MySQL returns carry no timezone. */
 function formatWhen(seconds: number): string {
@@ -122,7 +122,12 @@ export default function ConversationList({
                 )}
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm leading-tight">{c.title}</p>
+                  <p className="flex items-center gap-1 text-sm leading-tight">
+                    {c.styled === 1 && (
+                      <Wand2 className="h-3 w-3 shrink-0 text-muted-foreground" aria-label="Uses your style" />
+                    )}
+                    <span className="truncate">{c.title}</span>
+                  </p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
                     {c.message_count} {c.message_count === 1 ? 'message' : 'messages'}
                     {formatWhen(c.updated_ts) && ` · ${formatWhen(c.updated_ts)}`}
