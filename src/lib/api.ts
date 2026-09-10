@@ -55,8 +55,11 @@ export const api = {
   rewrite: (text: string, language: string, model: string, iteration?: { previousOutput: string; instruction: string }) =>
     request<RewriteResult>('/api/rewrite', { method: 'POST', body: JSON.stringify({ text, language, model, ...iteration }) }),
 
-  chat: (messages: ChatMessage[], model: string, conversationId?: string) =>
-    request<ChatResult>('/api/chat', { method: 'POST', body: JSON.stringify({ messages, model, conversationId }) }),
+  chat: (messages: ChatMessage[], model: string, opts?: { conversationId?: string; styled?: boolean }) =>
+    request<ChatResult>('/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({ messages, model, conversationId: opts?.conversationId, styled: opts?.styled })
+    }),
 
   getConversations: (limit?: number) =>
     request<ConversationSummary[]>(`/api/conversations${limit ? `?limit=${limit}` : ''}`),
@@ -119,12 +122,16 @@ export interface ChatResult {
   /** Null when the reply came back but saving it failed. */
   conversationId: string | null;
   title: string | null;
+  /** False when style was asked for but the library had no texts to learn from. */
+  styled: boolean;
 }
 
 export interface ConversationSummary {
   id: string;
   title: string;
   model: string | null;
+  /** MySQL TINYINT: 1 when the conversation applies the author's style. */
+  styled: number;
   input_tokens: number;
   output_tokens: number;
   message_count: number;

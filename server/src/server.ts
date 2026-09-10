@@ -12,7 +12,8 @@ import {
   buildRewriteSystem,
   buildRewriteUser,
   buildRewriteIterationUser,
-  buildChatSystem
+  buildChatSystem,
+  buildStyledChatSystem
 } from './prompts';
 import { logger } from './logger';
 
@@ -407,32 +408,12 @@ app.post('/api/rewrite', requireApiKey, async (req, res) => {
   if (!text) { res.status(400).json({ error: 'text is required' }); return; }
 
   try {
-    // Fetch preferences from DB
-    const [prefRows] = await pool.query<RowDataPacket[]>('SELECT value FROM settings WHERE `key` = ?', ['preferences']);
-    const preferences = prefRows.length > 0 ? prefRows[0].value : undefined;
+    const { examples, preferences } = await loadStyleContext();
 
-    // Fetch 15 most recent texts
-    const [textRows] = await pool.query<RowDataPacket[]>(`
-      SELECT t.id, t.title, t.content,
-             GROUP_CONCAT(DISTINCT c.name ORDER BY c.name SEPARATOR ', ') as categories
-      FROM texts t
-      LEFT JOIN text_categories tc ON t.id = tc.text_id
-      LEFT JOIN categories c ON tc.category_id = c.id
-      GROUP BY t.id, t.title, t.content
-      ORDER BY t.created_at DESC
-      LIMIT 15
-    `);
-
-    if (textRows.length === 0) {
+    if (examples.length === 0) {
       res.status(400).json({ error: 'No texts in library. Add some texts first to establish your style.' });
       return;
     }
-
-    const examples = textRows.map(row => ({
-      title: row.title,
-      content: row.content,
-      category: row.categories || 'other'
-    }));
 
     const systemPrompt = buildRewriteSystem(examples, preferences, language);
     const userMessage = (previousOutput && instruction)
@@ -471,7 +452,7 @@ app.get('/api/models', requireApiKey, (_req, res) => {
 // ── Chat ──────────────────────────────────────────────────────────────────────
 
 app.post('/api/chat', requireApiKey, async (req, res) => {
-  const { messages, model, conversationId } = req.body;
+  const { messages, model, conversationId, styled } = req.body;
 
   if (!Array.isArray(messages) || messages.length === 0) {
     res.status(400).json({ error: 'messages is required' });
@@ -487,8 +468,23 @@ app.post('/api/chat', requireApiKey, async (req, res) => {
     return;
   }
 
+  const wantsStyle = styled === true;
+
   try {
-    const result = await callAIChat(model, buildChatSystem(), cleaned, 4000);
+    // An empty library can't teach a voice, so the turn falls back to plain
+    // chat rather than failing — the client says so.
+    let systemPrompt = buildChatSystem();
+    let styleApplied = false;
+
+    if (wantsStyle) {
+      const { examples, preferences } = await loadStyleContext();
+      if (examples.length > 0) {
+        systemPrompt = buildStyledChatSystem(examples, preferences);
+        styleApplied = true;
+      }
+    }
+
+    const result = await callAIChat(model, systemPrompt, cleaned, 4000);
 
     // A failed write must not cost the user the reply, so persistence is
     // best-effort and the turn is returned either way.
@@ -499,6 +495,7 @@ app.post('/api/chat', requireApiKey, async (req, res) => {
         messages: cleaned,
         reply: result.outputText,
         model,
+        styled: styleApplied,
         inputTokens: result.inputTokens,
         outputTokens: result.outputTokens
       });
@@ -511,7 +508,8 @@ app.post('/api/chat', requireApiKey, async (req, res) => {
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,
       conversationId: saved?.id ?? null,
-      title: saved?.title ?? null
+      title: saved?.title ?? null,
+      styled: styleApplied
     });
   } catch (error) {
     logger.error('[POST /api/chat]', error);
@@ -526,7 +524,7 @@ app.get('/api/conversations', requireApiKey, async (req, res) => {
     const requested = parseInt(req.query.limit as string || '50');
     const limit = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 200) : 50;
     const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT c.id, c.title, c.model, c.input_tokens, c.output_tokens, c.created_at, c.updated_at,
+      `SELECT c.id, c.title, c.model, c.styled, c.input_tokens, c.output_tokens, c.created_at, c.updated_at,
               UNIX_TIMESTAMP(c.updated_at) AS updated_ts,
               COUNT(m.id) AS message_count
        FROM conversations c
@@ -596,6 +594,40 @@ app.delete('/api/conversations/:id', requireApiKey, async (req, res) => {
   }
 });
 
+// ─── Helper: the author's style corpus ────────────────────────────────────────
+
+/** The library examples and stored preferences that teach the author's voice. */
+async function loadStyleContext(): Promise<{
+  examples: Array<{ title: string; content: string; category: string }>;
+  preferences?: string;
+}> {
+  const [prefRows] = await pool.query<RowDataPacket[]>(
+    'SELECT value FROM settings WHERE `key` = ?',
+    ['preferences']
+  );
+  const preferences = prefRows.length > 0 ? prefRows[0].value : undefined;
+
+  const [textRows] = await pool.query<RowDataPacket[]>(`
+    SELECT t.id, t.title, t.content,
+           GROUP_CONCAT(DISTINCT c.name ORDER BY c.name SEPARATOR ', ') as categories
+    FROM texts t
+    LEFT JOIN text_categories tc ON t.id = tc.text_id
+    LEFT JOIN categories c ON tc.category_id = c.id
+    GROUP BY t.id, t.title, t.content
+    ORDER BY t.created_at DESC
+    LIMIT 15
+  `);
+
+  return {
+    examples: textRows.map(row => ({
+      title: row.title,
+      content: row.content,
+      category: row.categories || 'other'
+    })),
+    preferences
+  };
+}
+
 // ─── Helper: persist a chat turn ──────────────────────────────────────────────
 
 function deriveTitle(text: string): string {
@@ -614,6 +646,7 @@ async function persistChatTurn(opts: {
   messages: ChatMessage[];
   reply: string;
   model: string;
+  styled: boolean;
   inputTokens: number;
   outputTokens: number;
 }): Promise<{ id: string; title: string }> {
@@ -645,17 +678,17 @@ async function persistChatTurn(opts: {
       stored = counts[0].total;
       await conn.execute(
         `UPDATE conversations
-         SET model = ?, input_tokens = input_tokens + ?, output_tokens = output_tokens + ?
+         SET model = ?, styled = ?, input_tokens = input_tokens + ?, output_tokens = output_tokens + ?
          WHERE id = ?`,
-        [opts.model || null, opts.inputTokens, opts.outputTokens, id]
+        [opts.model || null, opts.styled ? 1 : 0, opts.inputTokens, opts.outputTokens, id]
       );
     } else {
       id = generateId();
       title = deriveTitle(opts.messages[0].content);
       await conn.execute(
-        `INSERT INTO conversations (id, title, model, input_tokens, output_tokens)
-         VALUES (?, ?, ?, ?, ?)`,
-        [id, title, opts.model || null, opts.inputTokens, opts.outputTokens]
+        `INSERT INTO conversations (id, title, model, styled, input_tokens, output_tokens)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [id, title, opts.model || null, opts.styled ? 1 : 0, opts.inputTokens, opts.outputTokens]
       );
     }
 

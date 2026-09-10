@@ -9,7 +9,7 @@ import ModelSelect from '@/components/ModelSelect';
 import ConversationList from '@/components/ConversationList';
 import { MODELS, DEFAULT_MODEL_ID } from '@/lib/models';
 import { toast } from 'sonner';
-import { Loader2, SendHorizontal, Copy, Check, MessageSquare, History, Plus } from 'lucide-react';
+import { Loader2, SendHorizontal, Copy, Check, MessageSquare, History, Plus, Wand2 } from 'lucide-react';
 
 const SUGGESTIONS = [
   'Help me brainstorm ideas for a post',
@@ -55,6 +55,7 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(false);
   const [model, setModel] = useState<string>(DEFAULT_MODEL_ID);
   const [tokens, setTokens] = useState(0);
+  const [styled, setStyled] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -109,6 +110,7 @@ export default function ChatPage() {
       setMessages(conv.messages);
       setActiveId(conv.id);
       setTokens(conv.input_tokens + conv.output_tokens);
+      setStyled(conv.styled === 1);
       // A conversation may name a model that has since left the registry.
       if (conv.model && MODELS.some(m => m.id === conv.model)) setModel(conv.model);
       setInput('');
@@ -124,7 +126,13 @@ export default function ChatPage() {
   };
 
   /** Move the touched conversation to the top of the list, adding it if new. */
-  const trackConversation = (id: string, title: string, messageCount: number, addedTokens: number) => {
+  const trackConversation = (
+    id: string,
+    title: string,
+    messageCount: number,
+    addedTokens: number,
+    styleApplied: boolean
+  ) => {
     setConversations(prev => {
       const existing = prev.find(c => c.id === id);
       const now = new Date().toISOString();
@@ -132,6 +140,7 @@ export default function ChatPage() {
         ? {
             ...existing,
             model,
+            styled: styleApplied ? 1 : 0,
             message_count: messageCount,
             output_tokens: existing.output_tokens + addedTokens,
             updated_at: now,
@@ -141,6 +150,7 @@ export default function ChatPage() {
             id,
             title,
             model,
+            styled: styleApplied ? 1 : 0,
             input_tokens: 0,
             output_tokens: addedTokens,
             message_count: messageCount,
@@ -162,15 +172,19 @@ export default function ChatPage() {
     setLoading(true);
 
     try {
-      const result = await api.chat(next, model, activeId ?? undefined);
+      const result = await api.chat(next, model, { conversationId: activeId ?? undefined, styled });
       setMessages([...next, { role: 'assistant', content: result.reply }]);
       const turnTokens = result.inputTokens + result.outputTokens;
       setTokens(t => t + turnTokens);
 
+      if (styled && !result.styled) {
+        toast.warning('No texts in your library yet — replied without your style');
+      }
+
       if (result.conversationId) {
         setActiveId(result.conversationId);
         rememberActiveId(result.conversationId);
-        trackConversation(result.conversationId, result.title ?? content, next.length + 1, turnTokens);
+        trackConversation(result.conversationId, result.title ?? content, next.length + 1, turnTokens, result.styled);
       } else {
         toast.warning('Replied, but this conversation could not be saved');
       }
@@ -257,11 +271,29 @@ export default function ChatPage() {
               {conversations.find(c => c.id === activeId)?.title ?? 'Chat'}
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              A plain conversation — nothing here is rewritten in your style.
+              {styled
+                ? 'Replies are written in your voice, drawn from your library and preferences.'
+                : 'A plain conversation — nothing here is rewritten in your style.'}
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap sm:justify-end shrink-0">
             {tokens > 0 && <Badge variant="outline">{tokens.toLocaleString()} tokens</Badge>}
+            <Button
+              variant={styled ? 'default' : 'outline'}
+              size="sm"
+              aria-pressed={styled}
+              onClick={() => setStyled(v => !v)}
+              disabled={loading}
+              title={
+                styled
+                  ? "Replies are rewritten in your library's voice"
+                  : 'Replies are plain — your style is not applied'
+              }
+              className="h-9 gap-1.5 px-2.5 text-xs"
+            >
+              <Wand2 className="h-3.5 w-3.5" />
+              My style
+            </Button>
             <ModelSelect value={model} onChange={setModel} disabled={loading} className="w-48" />
             <Button
               variant="ghost"
@@ -293,8 +325,9 @@ export default function ChatPage() {
             <div className="h-full flex flex-col items-center justify-center gap-4 text-center px-4">
               <MessageSquare className="h-7 w-7 text-muted-foreground" />
               <p className="text-sm text-muted-foreground max-w-sm">
-                Ask anything. This is a direct conversation with the model — your library and style
-                preferences are not applied here.
+                {styled
+                  ? 'Ask anything. Anything the model writes for you comes back in your own voice, learned from your library.'
+                  : 'Ask anything. This is a direct conversation with the model — your library and style preferences are not applied here.'}
               </p>
               <div className="flex flex-wrap gap-1.5 justify-center">
                 {SUGGESTIONS.map(s => (
